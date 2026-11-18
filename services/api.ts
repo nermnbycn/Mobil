@@ -1,0 +1,1 @@
+export const BASE_URL = "https://hr-test-api.bi360.com.tr";
