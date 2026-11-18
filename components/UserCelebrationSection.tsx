@@ -20,6 +20,7 @@ import {
   fetchAnniversaryUsers,
   fetchWeeklyBirthdays,
   fetchWeeklyAnniversaries,
+  fetchNewJoiners,
 } from "../redux/slices/UserSlice";
 
 import UserCelebrationCard from "./UserCelebrationCard";
@@ -54,6 +55,9 @@ export default function UserCelebrationSection() {
     anniversaryError,
     weeklyBirthdayError,
     weeklyAnniversaryError,
+    newJoiners,
+    newJoinersStatus,
+    newJoinersError,
   } = useSelector((state: RootState) => state.user);
 
   // =====================================================
@@ -78,6 +82,7 @@ export default function UserCelebrationSection() {
   useEffect(() => {
     dispatch(fetchBirthdayUsers());
     dispatch(fetchAnniversaryUsers());
+    dispatch(fetchNewJoiners());
   }, [dispatch]);
 
   // =====================================================
@@ -334,6 +339,33 @@ export default function UserCelebrationSection() {
             "anniversary",
             anniversaryPeriod
           )
+        )}
+      </View>
+
+      {/* ARAMIZA HOŞ GELDİNİZ — SEÇENEK YOK */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.heading}>Aramıza Hoş Geldiniz</Text>
+        </View>
+
+        {newJoinersStatus === "loading" || newJoinersStatus === "idle" ? (
+          <ActivityIndicator color={COLORS.primary} />
+        ) : newJoinersError ? (
+          <Text style={styles.error}>{newJoinersError}</Text>
+        ) : (
+          <FlatList
+            horizontal
+            data={newJoiners}
+            keyExtractor={(item, index) => `welcome-${item.id || index}`}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <Text style={styles.empty}>Yeni katılan çalışan bulunmuyor.</Text>
+            }
+            renderItem={({ item }) => (
+              <UserCelebrationCard user={item} type="welcome" />
+            )}
+          />
         )}
       </View>
     </View>

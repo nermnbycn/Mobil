@@ -1,11 +1,7 @@
-
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import * as SecureStore from "expo-secure-store";
 import { BASE_URL } from "../../services/api";
 
-// =====================================================
-// KULLANICI MODELİ
-// =====================================================
 export interface User {
   id: string;
   nameSurname: string;
@@ -17,52 +13,48 @@ export interface User {
   daysUntilAnniversary?: number;
 }
 
-type RequestStatus =
-  | "idle"
-  | "loading"
-  | "succeeded"
-  | "failed";
+type RequestStatus = "idle" | "loading" | "succeeded" | "failed";
 
 interface UserState {
   birthdayUsers: User[];
   anniversaryUsers: User[];
   weeklyBirthdays: User[];
   weeklyAnniversaries: User[];
+  newJoiners: User[];
 
   birthdayStatus: RequestStatus;
   anniversaryStatus: RequestStatus;
   weeklyBirthdayStatus: RequestStatus;
   weeklyAnniversaryStatus: RequestStatus;
+  newJoinersStatus: RequestStatus;
 
   birthdayError: string | null;
   anniversaryError: string | null;
   weeklyBirthdayError: string | null;
   weeklyAnniversaryError: string | null;
+  newJoinersError: string | null;
 }
 
-// =====================================================
-// BAŞLANGIÇ STATE
-// =====================================================
 const initialState: UserState = {
   birthdayUsers: [],
   anniversaryUsers: [],
   weeklyBirthdays: [],
   weeklyAnniversaries: [],
+  newJoiners: [],
 
   birthdayStatus: "idle",
   anniversaryStatus: "idle",
   weeklyBirthdayStatus: "idle",
   weeklyAnniversaryStatus: "idle",
+  newJoinersStatus: "idle",
 
   birthdayError: null,
   anniversaryError: null,
   weeklyBirthdayError: null,
   weeklyAnniversaryError: null,
+  newJoinersError: null,
 };
 
-// =====================================================
-// JWT İLE API İSTEĞİ
-// =====================================================
 async function fetchUsers(endpoint: string): Promise<User[]> {
   const token = await SecureStore.getItemAsync("authToken");
 
@@ -71,7 +63,6 @@ async function fetchUsers(endpoint: string): Promise<User[]> {
   }
 
   const url = `${BASE_URL}${endpoint}`;
-
   console.log("[Celebration] İstek:", url);
 
   const response = await fetch(url, {
@@ -83,10 +74,7 @@ async function fetchUsers(endpoint: string): Promise<User[]> {
   });
 
   console.log("[Celebration] HTTP Status:", response.status);
-
-  // Yanıtı tek sefer oku
   const responseText = await response.text();
-
   let result: unknown;
 
   try {
@@ -96,9 +84,6 @@ async function fetchUsers(endpoint: string): Promise<User[]> {
     throw new Error("API geçerli JSON döndürmedi.");
   }
 
-  // =====================================================
-  // HTTP HATA KONTROLÜ
-  // =====================================================
   if (!response.ok) {
     const errorData =
       result !== null && typeof result === "object"
@@ -123,21 +108,6 @@ async function fetchUsers(endpoint: string): Promise<User[]> {
     throw new Error(`Kullanıcılar getirilemedi: ${message}`);
   }
 
-  // =====================================================
-  // YENİ API RESPONSE KONTROLÜ
-  //
-  // Desteklenen yapılar:
-  //
-  // 1) [ { ... }, { ... } ]
-  //
-  // 2) {
-  //      "data": [
-  //        { ... },
-  //        { ... }
-  //      ]
-  //    }
-  // =====================================================
-
   let users: unknown;
 
   if (Array.isArray(result)) {
@@ -158,77 +128,47 @@ async function fetchUsers(endpoint: string): Promise<User[]> {
         : typeof result
     );
 
-    throw new Error(
-      "API beklenen kullanıcı listesini döndürmedi."
-    );
+    throw new Error("API beklenen kullanıcı listesini döndürmedi.");
   }
 
   console.log("[Celebration] Kullanıcı sayısı:", users.length);
-
   return users as User[];
 }
 
-// =====================================================
-// BUGÜNKÜ DOĞUM GÜNLERİ
-// GET /api/Celebration/getTodayBirthdays
-// =====================================================
 export const fetchBirthdayUsers = createAsyncThunk<User[], void>(
   "user/fetchBirthdayUsers",
-  async () => {
-    return fetchUsers("/api/Celebration/getTodayBirthdays");
-  }
+  async () => fetchUsers("/api/Celebration/getTodayBirthdays")
 );
 
-// =====================================================
-// BUGÜNKÜ İŞ YIL DÖNÜMLERİ
-// GET /api/Celebration/getTodayAnniversaries
-// =====================================================
 export const fetchAnniversaryUsers = createAsyncThunk<User[], void>(
   "user/fetchAnniversaryUsers",
-  async () => {
-    return fetchUsers("/api/Celebration/getTodayAnniversaries");
-  }
+  async () => fetchUsers("/api/Celebration/getTodayAnniversaries")
 );
 
-// =====================================================
-// HAFTALIK DOĞUM GÜNLERİ
-// GET /api/Celebration/getWeekBirthdays
-// =====================================================
 export const fetchWeeklyBirthdays = createAsyncThunk<User[], void>(
   "user/fetchWeeklyBirthdays",
-  async () => {
-    return fetchUsers("/api/Celebration/getWeekBirthdays");
-  }
+  async () => fetchUsers("/api/Celebration/getWeekBirthdays")
 );
 
-// =====================================================
-// HAFTALIK İŞ YIL DÖNÜMLERİ
-// GET /api/Celebration/getWeekAnniversaries
-// =====================================================
 export const fetchWeeklyAnniversaries = createAsyncThunk<User[], void>(
   "user/fetchWeeklyAnniversaries",
-  async () => {
-    return fetchUsers("/api/Celebration/getWeekAnniversaries");
-  }
+  async () => fetchUsers("/api/Celebration/getWeekAnniversaries")
 );
 
-// =====================================================
-// REDUX SLICE
-// =====================================================
+// Yeni çalışanlar: backend'de bu endpoint oluşturulacak.
+export const fetchNewJoiners = createAsyncThunk<User[], void>(
+  "user/fetchNewJoiners",
+  async () => fetchUsers("/api/Celebration/getNewJoiners")
+);
+
 const userSlice = createSlice({
   name: "user",
   initialState,
-
   reducers: {
     clearCelebrationUsers: () => initialState,
   },
-
   extraReducers: (builder) => {
     builder
-
-      // =================================================
-      // BUGÜNKÜ DOĞUM GÜNLERİ
-      // =================================================
       .addCase(fetchBirthdayUsers.pending, (state) => {
         state.birthdayStatus = "loading";
         state.birthdayError = null;
@@ -244,10 +184,6 @@ const userSlice = createSlice({
         state.birthdayError =
           action.error.message ?? "Doğum günleri getirilemedi.";
       })
-
-      // =================================================
-      // BUGÜNKÜ İŞ YIL DÖNÜMLERİ
-      // =================================================
       .addCase(fetchAnniversaryUsers.pending, (state) => {
         state.anniversaryStatus = "loading";
         state.anniversaryError = null;
@@ -263,10 +199,6 @@ const userSlice = createSlice({
         state.anniversaryError =
           action.error.message ?? "İş yıl dönümleri getirilemedi.";
       })
-
-      // =================================================
-      // HAFTALIK DOĞUM GÜNLERİ
-      // =================================================
       .addCase(fetchWeeklyBirthdays.pending, (state) => {
         state.weeklyBirthdayStatus = "loading";
         state.weeklyBirthdayError = null;
@@ -282,10 +214,6 @@ const userSlice = createSlice({
         state.weeklyBirthdayError =
           action.error.message ?? "Haftalık doğum günleri getirilemedi.";
       })
-
-      // =================================================
-      // HAFTALIK İŞ YIL DÖNÜMLERİ
-      // =================================================
       .addCase(fetchWeeklyAnniversaries.pending, (state) => {
         state.weeklyAnniversaryStatus = "loading";
         state.weeklyAnniversaryError = null;
@@ -299,12 +227,25 @@ const userSlice = createSlice({
       .addCase(fetchWeeklyAnniversaries.rejected, (state, action) => {
         state.weeklyAnniversaryStatus = "failed";
         state.weeklyAnniversaryError =
-          action.error.message ??
-          "Haftalık iş yıl dönümleri getirilemedi.";
+          action.error.message ?? "Haftalık iş yıl dönümleri getirilemedi.";
+      })
+      .addCase(fetchNewJoiners.pending, (state) => {
+        state.newJoinersStatus = "loading";
+        state.newJoinersError = null;
+        state.newJoiners = [];
+      })
+      .addCase(fetchNewJoiners.fulfilled, (state, action) => {
+        state.newJoinersStatus = "succeeded";
+        state.newJoiners = action.payload;
+        state.newJoinersError = null;
+      })
+      .addCase(fetchNewJoiners.rejected, (state, action) => {
+        state.newJoinersStatus = "failed";
+        state.newJoinersError =
+          action.error.message ?? "Yeni çalışanlar getirilemedi.";
       });
   },
 });
 
 export const { clearCelebrationUsers } = userSlice.actions;
-
 export default userSlice.reducer;

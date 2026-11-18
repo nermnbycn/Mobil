@@ -41,13 +41,14 @@ import type { User } from "../redux/slices/UserSlice";
 import type { RootState, AppDispatch } from "../redux/Store";
 
 import { sendMessage } from "../redux/slices/MessageSlice";
+
 import { BASE_URL } from "../services/api";
 
 interface Props {
 
   user: User;
 
-  type: "birthday" | "anniversary";
+  type: "birthday" | "anniversary" | "welcome";
 
   isWeekly?: boolean;
 
@@ -76,10 +77,15 @@ const COLORS = {
 };
 
 function getImageUrl(imageUrl?: string | null): string | null {
+
   if (!imageUrl?.trim()) return null;
+
   const path = imageUrl.trim();
+
   if (/^https?:\/\//i.test(path)) return path;
+
   return `${BASE_URL.replace(/\/$/, "")}/${path.replace(/^\/+/, "")}`;
+
 }
 
 export default function UserCelebrationCard({
@@ -109,6 +115,7 @@ export default function UserCelebrationCard({
   const [checkingCelebration, setCheckingCelebration] = useState(false);
 
   const isBirthday = type === "birthday";
+  const isWelcome = type === "welcome";
 
   const imageUrl = getImageUrl(user.imageUrl);
 
@@ -136,7 +143,7 @@ export default function UserCelebrationCard({
 
     : fullName[0]?.toLocaleUpperCase("tr-TR") || "?";
 
-  const years = !isBirthday && currentUser.startDate
+  const years = !isBirthday && !isWelcome && currentUser.startDate
 
     ? new Date().getFullYear() - Number(currentUser.startDate.substring(0, 4))
 
@@ -153,67 +160,109 @@ export default function UserCelebrationCard({
     : undefined;
 
   // Kutlama kontrolünü sayfa odaklandığında güncelle.
+
   useFocusEffect(
+
     useCallback(() => {
+
       let active = true;
+
       const controller = new AbortController();
 
       const checkCelebration = async () => {
-        if (isWeekly || !user.id) {
+
+        if (isWelcome || isWeekly || !user.id) {
+
           if (active) setCheckingCelebration(false);
+
           return;
+
         }
 
         if (active) setCheckingCelebration(true);
 
         try {
+
           const token = await SecureStore.getItemAsync("authToken");
+
           if (!token) throw new Error("Oturum bulunamadı.");
 
           const url = `${BASE_URL.replace(/\/$/, "")}/api/Message/celebrated?receiverId=${encodeURIComponent(String(user.id))}&type=${encodeURIComponent(type)}`;
+
           const response = await fetch(url, {
+
             method: "GET",
+
             headers: {
+
               Authorization: `Bearer ${token}`,
+
               Accept: "application/json",
+
             },
+
             signal: controller.signal,
+
           });
 
           if (!response.ok) {
+
             throw new Error(`Kutlama kontrolü başarısız (HTTP ${response.status}). URL: ${url}`);
+
           }
 
           const result: unknown = await response.json();
+
           const body = result as {
+
             hasCelebrated?: boolean;
+
             data?: { hasCelebrated?: boolean } | boolean;
+
           } | null;
 
           const celebrated =
+
             body?.hasCelebrated === true ||
+
             body?.data === true ||
+
             (typeof body?.data === "object" &&
+
               body.data?.hasCelebrated === true);
 
           if (active) setHasCelebrated(celebrated);
+
         } catch (error) {
+
           if (active && !controller.signal.aborted) {
+
             console.warn("Kutlama kontrol hatası:", error);
+
             // Başarılı gönderim sonrası ekrandaki Kutlandı durumunu kaybetme.
+
           }
+
         } finally {
+
           if (active) setCheckingCelebration(false);
+
         }
+
       };
 
       void checkCelebration();
 
       return () => {
+
         active = false;
+
         controller.abort();
+
       };
-    }, [user.id, type, isWeekly]),
+
+    }, [user.id, type, isWeekly, isWelcome]),
+
   );
 
   const messageExamples = isBirthday
@@ -238,7 +287,7 @@ export default function UserCelebrationCard({
 
       ];
 
-  const disabled = isWeekly || hasCelebrated || checkingCelebration || sending;
+  const disabled = isWelcome || isWeekly || hasCelebrated || checkingCelebration || sending;
 
   const openModal = () => {
 
@@ -366,7 +415,7 @@ export default function UserCelebrationCard({
 
           <Ionicons
 
-            name={isBirthday ? "gift-outline" : "ribbon-outline"}
+            name={isWelcome ? "person-add-outline" : isBirthday ? "gift-outline" : "ribbon-outline"}
 
             size={15}
 
@@ -386,8 +435,9 @@ export default function UserCelebrationCard({
 
       <Text style={styles.description} numberOfLines={2}>
 
-        {isBirthday
-
+        {isWelcome
+          ? "Aramıza Hoş Geldin!"
+          : isBirthday
           ? isWeekly
 
             ? ""
@@ -398,7 +448,7 @@ export default function UserCelebrationCard({
 
       </Text>
 
-     {!isWeekly && (
+     {!isWeekly && !isWelcome && (
 
   <TouchableOpacity
 
@@ -490,7 +540,7 @@ export default function UserCelebrationCard({
 
                 <Ionicons
 
-                  name={isBirthday ? "gift-outline" : "ribbon-outline"}
+                  name={isWelcome ? "person-add-outline" : isBirthday ? "gift-outline" : "ribbon-outline"}
 
                   size={30}
 
