@@ -1,11 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { SvgXml } from "react-native-svg";
-
-import {
-  pulseSvg,
-  testsuiteSvg,
-} from "../assets/images/superapp/svgContents";
 import {
   Alert,
   Animated,
@@ -23,6 +17,8 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { BlurTargetView, BlurView } from "expo-blur";
+import { SvgUri } from "react-native-svg";
+import { BASE_URL } from "../services/api";
 
 interface Props {
   visible: boolean;
@@ -35,34 +31,86 @@ const COLORS = {
   white: "#FFFFFF",
 };
 
-// Görseller lokalde tutulur; hangi uygulamanın görüneceği API'den belirlenir.
-// Code alanları ApplicationSeeder ile eşleşmelidir.
-const LOGOS = {
-  WSA: require("../assets/images/superapp/app-logo-1.png"),
-  EFOR: require("../assets/images/superapp/app-logo-2.png"),
-  KAIZEN: require("../assets/images/superapp/app-logo-3.png"),
-  KPI: require("../assets/images/superapp/app-logo-4.png"),
-  HR_WEB: require("../assets/images/superapp/app-logo-5.png"),
-  OKR: require("../assets/images/superapp/app-logo-6.png"),
-  ACTION_SUITE: require("../assets/images/superapp/app-logo-9.png"),
-  POLIVALANS: require("../assets/images/superapp/app-logo-10.png"),
-  AKADEMI: require("../assets/images/superapp/app-logo-11.png"),
-  SOFT_HR: require("../assets/images/superapp/app-logo-13.png"),
-} as const;
-
 type TenantApp = {
-  id: number;
+  id: number | string;
   name: string;
-  code: string;
   link: string | null;
-  imageUrl: string | null;
+  logoUrl: string | null;
 };
 
-const API_BASE = "http://10.90.111.26:5277";
+type ApiApplication = {
+  id: number | string;
+  name: string;
+  url?: string | null;
+  link?: string | null;
+  logoUrl?: string | null;
+};
+
+type ApplicationsResponse = {
+  data?: ApiApplication[];
+  success?: boolean;
+  message?: string;
+  statusCode?: number;
+};
+
+const API_URL = `${BASE_URL}/api/Application/getAll`;
 const PAGE_SIZE = 9;
 
-function getLogo(code: string) {
-  return LOGOS[code as keyof typeof LOGOS] ?? null;
+function resolveImageUrl(value: string | null | undefined): string | null {
+  const path = value?.trim();
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith("//")) return `https:${path}`;
+  if (/^(data:|blob:)/i.test(path)) return null;
+  return `${BASE_URL.replace(/\/$/, "")}/${path.replace(/^\/+/, "")}`;
+}
+
+function ApplicationLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [logoUrl]);
+
+  if (!logoUrl || failed) {
+    return (
+      <View style={styles.logoFallback}>
+        <Text style={styles.logoFallbackText}>
+          {name.trim().charAt(0).toLocaleUpperCase("tr-TR") || "?"}
+        </Text>
+      </View>
+    );
+  }
+
+  if (/\.svg(?:[?#]|$)/i.test(logoUrl)) {
+    return (
+      <View style={styles.svgLogoContainer}>
+        <SvgUri
+          uri={logoUrl}
+          width="100%"
+          height="100%"
+          onError={(error) => {
+            console.log("SVG LOGO HATASI:", { name, logoUrl, error });
+            setFailed(true);
+          }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: logoUrl }}
+      style={styles.appImage}
+      resizeMode="contain"
+      onError={(event) => {
+        console.log("LOGO HATASI:", {
+          name,
+          logoUrl,
+          error: event.nativeEvent.error,
+        });
+        setFailed(true);
+      }}
+    />
+  );
 }
 
 const clamp = (value: number, low: number, high: number) =>
@@ -131,13 +179,23 @@ export default function SuperAppOverlay({
       try {
         const token = await SecureStore.getItemAsync("authToken");
         if (!token) throw new Error("Oturum bulunamadı.");
-        const response = await fetch(`${API_BASE}/api/mobile/applications/me`, {
+        const response = await fetch(`${API_URL}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error(`Uygulamalar yüklenemedi (HTTP ${response.status}).`);
-        const result: TenantApp[] = await response.json();
-        if (!Array.isArray(result)) throw new Error("Sunucu geçersiz veri döndürdü.");
-        if (!cancelled) setApplications(result);
+        const result: ApplicationsResponse = await response.json();
+        if (!Array.isArray(result?.data)) {
+          throw new Error("API, data alanında uygulama listesi döndürmedi.");
+        }
+
+        const apps: TenantApp[] = result.data.map((app) => ({
+          id: app.id,
+          name: app.name,
+          link: app.url ?? app.link ?? null,
+          logoUrl: resolveImageUrl(app.logoUrl),
+        }));
+
+        if (!cancelled) setApplications(apps);
       } catch (error) {
         if (!cancelled) setAppsError(error instanceof Error ? error.message : "Uygulamalar yüklenemedi.");
       } finally {
@@ -334,17 +392,7 @@ export default function SuperAppOverlay({
     },
   ]}
 >
-  {app.code.toUpperCase() === "PULSE" ? (
-    <SvgXml xml={pulseSvg} width="100%" height="100%" />
-  ) : app.code.toUpperCase() === "TEST_SUITE" ? (
-    <SvgXml xml={testsuiteSvg} width="100%" height="100%" />
-  ) : getLogo(app.code.toUpperCase()) ? (
-    <Image source={getLogo(app.code.toUpperCase())!} style={styles.appImage} resizeMode="cover" />
-  ) : (
-    <View style={{ width: "100%", height: "100%", backgroundColor: "#384665", justifyContent: "center", alignItems: "center" }}>
-      <Text style={{ color: "white", fontWeight: "700", fontSize: 22 }}>{app.name.charAt(0)}</Text>
-    </View>
-  )}
+  <ApplicationLogo name={app.name} logoUrl={app.logoUrl} />
 </View>
 
                       <Text
@@ -450,6 +498,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   appImage: { width: "100%", height: "100%" },
+  svgLogoContainer: {
+    width: "100%",
+    height: "100%",
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoFallback: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#384665",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoFallbackText: { color: "#FFFFFF", fontWeight: "700", fontSize: 22 },
   appName: {
     fontWeight: "600",
     color: COLORS.white,
