@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -7,18 +7,26 @@ import {
 } from "react-native";
 
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import type { NavigatorScreenParams } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "../redux/Store";
+import { fetchUnreadCount } from "../redux/slices/NotificationSlice";
+
 import HomeNavigator from "./HomeNavigator";
+import type { HomeStackParamList } from "./HomeNavigator";
+
 import MessageNavigator from "./MessageNavigator";
 import NotificationNavigator from "./NotificationNavigator";
 import ProfileNavigator from "./ProfileNavigator";
 
+import { navigationRef } from "./NavigationService";
 import { useHeaderScroll } from "../context/HeaderScrollContext";
 
 export type MainTabParamList = {
-  HomeTab: undefined;
+  HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   MessageTab: undefined;
   SuperAppTab: undefined;
   NotificationTab: undefined;
@@ -28,10 +36,13 @@ export type MainTabParamList = {
 interface MainTabNavigatorProps {
   onSuperAppPress: () => void;
   onLogout: () => Promise<void>;
-  onShortcutPress: (key: string) => void;
+
+  // App.tsx üzerinden gelen yönlendirme
+  onShortcutPress?: (key: string) => void;
 }
 
-type IconName = React.ComponentProps<typeof Ionicons>["name"];
+type IconName =
+  React.ComponentProps<typeof Ionicons>["name"];
 
 type TabIconProps = {
   focused: boolean;
@@ -54,8 +65,11 @@ const COLORS = {
   notification: "#DC2626",
 };
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+const clamp = (
+  value: number,
+  min: number,
+  max: number
+) => Math.min(Math.max(value, min), max);
 
 function TabIcon({
   focused,
@@ -87,9 +101,23 @@ export default function MainTabNavigator({
   onLogout,
   onShortcutPress,
 }: MainTabNavigatorProps) {
+  const dispatch = useDispatch<AppDispatch>();
+
+  const unreadCount = useSelector(
+    (state: RootState) =>
+      state.notification.unreadCount ?? 0
+  );
+
+  useEffect(() => {
+    dispatch(fetchUnreadCount());
+  }, [dispatch]);
+
   const insets = useSafeAreaInsets();
 
-  const { setCollapsed, setIsHomeTab } = useHeaderScroll();
+  const {
+    setCollapsed,
+    resetHomeShortcut,
+  } = useHeaderScroll();
 
   const { width, height } = useWindowDimensions();
 
@@ -98,7 +126,7 @@ export default function MainTabNavigator({
   const responsiveScale = clamp(
     shortestSide / 430,
     1,
-    1.5,
+    1.5
   );
 
   const barScale = Math.min(responsiveScale, 1.15);
@@ -123,14 +151,14 @@ export default function MainTabNavigator({
         routes: { name: string }[];
       };
     },
-    screenName: string,
+    screenName: string
   ) => {
     const state = navigation.getState();
 
     return state.routes[state.index]?.name === screenName;
   };
 
-  const getItemStyle = (active: boolean) => ({
+  const getItemStyle = (_active: boolean) => ({
     backgroundColor: COLORS.white,
     padding: 0,
     margin: 0,
@@ -140,7 +168,7 @@ export default function MainTabNavigator({
   const renderTabIcon = (
     focused: boolean,
     activeName: IconName,
-    inactiveName: IconName,
+    inactiveName: IconName
   ) => (
     <TabIcon
       focused={focused}
@@ -151,21 +179,51 @@ export default function MainTabNavigator({
     />
   );
 
+  // HEADER KISAYOL KARTLARI
+  const handleShortcutPress = (key: string) => {
+    setCollapsed(false);
+
+    // App.tsx üzerinden fonksiyon geldiyse onu kullan
+    if (onShortcutPress) {
+      onShortcutPress(key);
+      return;
+    }
+
+    // App.tsx üzerinden fonksiyon gelmezse
+    // mevcut yönlendirme sistemini kullan
+    if (!navigationRef.isReady()) return;
+
+    const screens: Record<
+      string,
+      keyof HomeStackParamList
+    > = {
+      overview: "Home",
+      blogs: "Blog",
+      news: "CompanyNew",
+      announcement: "Announcement",
+      surveys: "Survey",
+    };
+
+    const screen = screens[key];
+
+    if (!screen) return;
+
+    switch (screen) {
+      case "Home":
+      case "Blog":
+      case "CompanyNew":
+      case "Announcement":
+      case "Survey":
+        navigationRef.navigate("HomeTab", {
+          screen,
+        });
+        break;
+    }
+  };
+
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
-
-      // SEKME DEĞİŞTİĞİNDE HEADER DURUMUNU GÜNCELLE
-      screenListeners={({ route }) => ({
-        focus: () => {
-          // Home sekmesinde mevcut header davranışı korunur.
-          setIsHomeTab(route.name === "HomeTab");
-
-          // Yeni sekmeye geçildiğinde header açık başlar.
-          setCollapsed(false);
-        },
-      })}
-
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -196,34 +254,40 @@ export default function MainTabNavigator({
         },
       }}
     >
-      {/* =================================================
-          ANA SAYFA
-      ================================================= */}
+      {/* ANA SAYFA */}
       <Tab.Screen
         name="HomeTab"
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            resetHomeShortcut();
+            setCollapsed(false);
+
+            navigation.navigate("HomeTab", {
+              screen: "Home",
+            });
+          },
+        })}
         options={({ navigation }) => ({
           tabBarItemStyle: getItemStyle(
-            isActive(navigation, "HomeTab"),
+            isActive(navigation, "HomeTab")
           ),
 
           tabBarIcon: ({ focused }) =>
             renderTabIcon(
               focused,
               "home",
-              "home-outline",
+              "home-outline"
             ),
         })}
       >
         {() => (
           <HomeNavigator
-            onShortcutPress={onShortcutPress}
+            onShortcutPress={handleShortcutPress}
           />
         )}
       </Tab.Screen>
 
-      {/* =================================================
-          MESAJLAR
-      ================================================= */}
+      {/* KUTLAMA MESAJLARI */}
       <Tab.Screen
         name="MessageTab"
         component={MessageNavigator}
@@ -231,33 +295,19 @@ export default function MainTabNavigator({
           lazy: false,
 
           tabBarItemStyle: getItemStyle(
-            isActive(navigation, "MessageTab"),
+            isActive(navigation, "MessageTab")
           ),
 
           tabBarIcon: ({ focused }) =>
             renderTabIcon(
               focused,
               "chatbubble-ellipses",
-              "chatbubble-ellipses-outline",
+              "chatbubble-ellipses-outline"
             ),
-
-          tabBarBadgeStyle: {
-            backgroundColor: COLORS.notification,
-            color: COLORS.white,
-            fontSize: 10,
-            fontWeight: "800",
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
-            textAlign: "center",
-            top: 8,
-          },
         })}
       />
 
-      {/* =================================================
-          SUPER APP
-      ================================================= */}
+      {/* SUPER APP */}
       <Tab.Screen
         name="SuperAppTab"
         component={EmptySuperAppScreen}
@@ -303,41 +353,62 @@ export default function MainTabNavigator({
         }}
       />
 
-      {/* =================================================
-          BİLDİRİMLER
-      ================================================= */}
+      {/* BİLDİRİMLER */}
       <Tab.Screen
         name="NotificationTab"
         component={NotificationNavigator}
+        listeners={{
+          focus: () => {
+            dispatch(fetchUnreadCount());
+          },
+        }}
         options={({ navigation }) => ({
           tabBarItemStyle: getItemStyle(
-            isActive(navigation, "NotificationTab"),
+            isActive(navigation, "NotificationTab")
           ),
 
           tabBarIcon: ({ focused }) =>
             renderTabIcon(
               focused,
               "notifications",
-              "notifications-outline",
+              "notifications-outline"
             ),
+
+          // OKUNMAMIŞ BİLDİRİM SAYISI
+          tabBarBadge:
+            unreadCount > 0
+              ? unreadCount > 99
+                ? "99+"
+                : unreadCount
+              : undefined,
+
+          tabBarBadgeStyle: {
+            backgroundColor: COLORS.notification,
+            color: COLORS.white,
+            fontSize: 10,
+            fontWeight: "800",
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            textAlign: "center",
+            top: 8,
+          },
         })}
       />
 
-      {/* =================================================
-          PROFİL
-      ================================================= */}
+      {/* PROFİL */}
       <Tab.Screen
         name="ProfileTab"
         options={({ navigation }) => ({
           tabBarItemStyle: getItemStyle(
-            isActive(navigation, "ProfileTab"),
+            isActive(navigation, "ProfileTab")
           ),
 
           tabBarIcon: ({ focused }) =>
             renderTabIcon(
               focused,
               "person",
-              "person-outline",
+              "person-outline"
             ),
         })}
       >

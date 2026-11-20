@@ -1,3 +1,5 @@
+
+
 import React, { useCallback, useEffect, useState } from "react";
 
 import {
@@ -44,6 +46,12 @@ import { sendMessage } from "../redux/slices/MessageSlice";
 
 import { BASE_URL } from "../services/api";
 
+// =====================================================
+
+// PROPS
+
+// =====================================================
+
 interface Props {
 
   user: User;
@@ -52,9 +60,21 @@ interface Props {
 
   isWeekly?: boolean;
 
-  onSendMessage?: (userId: string, message: string) => Promise<void>;
+  onSendMessage?: (
+
+    userId: string,
+
+    message: string
+
+  ) => Promise<void>;
 
 }
+
+// =====================================================
+
+// RENKLER
+
+// =====================================================
 
 const COLORS = {
 
@@ -76,17 +96,35 @@ const COLORS = {
 
 };
 
-function getImageUrl(imageUrl?: string | null): string | null {
+// =====================================================
 
+// RESİM URL
+
+// =====================================================
+
+function getImageUrl(imageUrl?: string | null): string | null {
   if (!imageUrl?.trim()) return null;
 
   const path = imageUrl.trim();
 
-  if (/^https?:\/\//i.test(path)) return path;
+  // Base64 görsel
+  if (/^data:image\//i.test(path)) {
+    return path;
+  }
 
-  return `${BASE_URL.replace(/\/$/, "")}/${path.replace(/^\/+/, "")}`;
+  // Tam URL
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
 
+  // Sunucudaki görsel yolu
+  return `${BASE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
+// =====================================================
+
+// USER CELEBRATION CARD
+
+// =====================================================
 
 export default function UserCelebrationCard({
 
@@ -100,7 +138,11 @@ export default function UserCelebrationCard({
 
   const dispatch = useDispatch<AppDispatch>();
 
-  const senderId = useSelector((state: RootState) => state.profile.profile?.id);
+  const senderId = useSelector(
+
+    (state: RootState) => state.profile.profile?.id
+
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -112,16 +154,31 @@ export default function UserCelebrationCard({
 
   const [hasCelebrated, setHasCelebrated] = useState(false);
 
-  const [checkingCelebration, setCheckingCelebration] = useState(false);
+  const [checkingCelebration, setCheckingCelebration] =
+
+    useState(false);
 
   const isBirthday = type === "birthday";
+
   const isWelcome = type === "welcome";
 
   const imageUrl = getImageUrl(user.imageUrl);
 
-  useEffect(() => setImageError(false), [imageUrl]);
+  useEffect(() => {
+    if (__DEV__) console.log("[USER IMAGE]", { userId: user.id, raw: user.imageUrl, resolved: imageUrl });
+  }, [user.id, user.imageUrl, imageUrl]);
 
-  // Yeni API alanları: nameSurname ve startDate
+  useEffect(() => {
+
+    setImageError(false);
+
+  }, [imageUrl]);
+
+  // =====================================================
+
+  // KULLANICI BİLGİLERİ
+
+  // =====================================================
 
   const currentUser = user as User & {
 
@@ -131,23 +188,35 @@ export default function UserCelebrationCard({
 
   };
 
-  const fullName = currentUser.nameSurname?.trim() || "Kullanıcı";
+  const fullName =
+
+    currentUser.nameSurname?.trim() || "Kullanıcı";
 
   const firstName = fullName.split(/\s+/)[0];
 
   const nameParts = fullName.split(/\s+/);
 
-  const initials = nameParts.length > 1
+  const initials =
 
-    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toLocaleUpperCase("tr-TR")
+    nameParts.length > 1
 
-    : fullName[0]?.toLocaleUpperCase("tr-TR") || "?";
+      ? `${nameParts[0][0]}${
 
-  const years = !isBirthday && !isWelcome && currentUser.startDate
+          nameParts[nameParts.length - 1][0]
 
-    ? new Date().getFullYear() - Number(currentUser.startDate.substring(0, 4))
+        }`.toLocaleUpperCase("tr-TR")
 
-    : 0;
+      : fullName[0]?.toLocaleUpperCase("tr-TR") || "?";
+
+  const years =
+
+    !isBirthday && !isWelcome && currentUser.startDate
+
+      ? new Date().getFullYear() -
+
+        Number(currentUser.startDate.substring(0, 4))
+
+      : 0;
 
   const remainingDays = isWeekly
 
@@ -159,7 +228,13 @@ export default function UserCelebrationCard({
 
     : undefined;
 
-  // Kutlama kontrolünü sayfa odaklandığında güncelle.
+  // =====================================================
+
+  // KUTLAMA DURUMUNU KONTROL ET
+
+  // DOĞUM GÜNÜ + YIL DÖNÜMÜ + HOŞ GELDİN
+
+  // =====================================================
 
   useFocusEffect(
 
@@ -171,23 +246,51 @@ export default function UserCelebrationCard({
 
       const checkCelebration = async () => {
 
-        if (isWelcome || isWeekly || !user.id) {
+        if (isWeekly || !user.id) {
 
-          if (active) setCheckingCelebration(false);
+          if (active) {
+
+            setCheckingCelebration(false);
+
+          }
 
           return;
 
         }
 
-        if (active) setCheckingCelebration(true);
+        if (active) {
+
+          setCheckingCelebration(true);
+
+        }
 
         try {
 
-          const token = await SecureStore.getItemAsync("authToken");
+          const token = await SecureStore.getItemAsync(
 
-          if (!token) throw new Error("Oturum bulunamadı.");
+            "authToken"
 
-          const url = `${BASE_URL.replace(/\/$/, "")}/api/Message/celebrated?receiverId=${encodeURIComponent(String(user.id))}&type=${encodeURIComponent(type)}`;
+          );
+
+          if (!token) {
+
+            throw new Error("Oturum bulunamadı.");
+
+          }
+
+          const url =
+
+            `${BASE_URL.replace(/\/+$/, "")}` +
+
+            `/api/Message/celebrated` +
+
+            `?receiverId=${encodeURIComponent(
+
+              String(user.id)
+
+            )}` +
+
+            `&type=${encodeURIComponent(type)}`;
 
           const response = await fetch(url, {
 
@@ -207,7 +310,11 @@ export default function UserCelebrationCard({
 
           if (!response.ok) {
 
-            throw new Error(`Kutlama kontrolü başarısız (HTTP ${response.status}). URL: ${url}`);
+            throw new Error(
+
+              `Kutlama kontrolü başarısız. HTTP: ${response.status}`
+
+            );
 
           }
 
@@ -217,7 +324,15 @@ export default function UserCelebrationCard({
 
             hasCelebrated?: boolean;
 
-            data?: { hasCelebrated?: boolean } | boolean;
+            data?:
+
+              | {
+
+                  hasCelebrated?: boolean;
+
+                }
+
+              | boolean;
 
           } | null;
 
@@ -231,21 +346,33 @@ export default function UserCelebrationCard({
 
               body.data?.hasCelebrated === true);
 
-          if (active) setHasCelebrated(celebrated);
+          if (active) {
+
+            setHasCelebrated(celebrated);
+
+          }
 
         } catch (error) {
 
           if (active && !controller.signal.aborted) {
 
-            console.warn("Kutlama kontrol hatası:", error);
+            console.warn(
 
-            // Başarılı gönderim sonrası ekrandaki Kutlandı durumunu kaybetme.
+              "[CELEBRATION] Kontrol hatası:",
+
+              error
+
+            );
 
           }
 
         } finally {
 
-          if (active) setCheckingCelebration(false);
+          if (active) {
+
+            setCheckingCelebration(false);
+
+          }
 
         }
 
@@ -261,33 +388,67 @@ export default function UserCelebrationCard({
 
       };
 
-    }, [user.id, type, isWeekly, isWelcome]),
+    }, [user.id, type, isWeekly])
 
   );
 
-  const messageExamples = isBirthday
+  // =====================================================
+
+  // MESAJ ÖRNEKLERİ
+
+  // =====================================================
+
+  const messageExamples = isWelcome
 
     ? [
 
-        `Doğum günün kutlu olsun ${firstName}! 🎂`,
+        `Aramıza hoş geldin ${firstName}! 🎉`,
 
-        `Nice mutlu yıllara ${firstName}! 🎉`,
+        `Yeni görevinde başarılar dilerim ${firstName}! 👏`,
 
-        `Mutlu seneler dilerim ${firstName}! 🎈`,
+        `Ekibimize katılmana çok sevindik ${firstName}! 🎊`,
 
       ]
 
-    : [
+    : isBirthday
 
-        `${years}. iş yıl dönümün kutlu olsun ${firstName}! 🎉`,
+      ? [
 
-        `Nice başarılı yıllara ${firstName}! 👏`,
+          `Doğum günün kutlu olsun ${firstName}! 🎂`,
 
-        `İş yıl dönümünü tebrik ederim ${firstName}! 🎊`,
+          `Nice mutlu yıllara ${firstName}! 🎉`,
 
-      ];
+          `Mutlu seneler dilerim ${firstName}! 🎈`,
 
-  const disabled = isWelcome || isWeekly || hasCelebrated || checkingCelebration || sending;
+        ]
+
+      : [
+
+          `${years}. iş yıl dönümün kutlu olsun ${firstName}! 🎉`,
+
+          `Nice başarılı yıllara ${firstName}! 👏`,
+
+          `İş yıl dönümünü tebrik ederim ${firstName}! 🎊`,
+
+        ];
+
+  // Hoş geldin kutlaması da aktif
+
+  const disabled =
+
+    isWeekly ||
+
+    hasCelebrated ||
+
+    checkingCelebration ||
+
+    sending;
+
+  // =====================================================
+
+  // MODALI AÇ
+
+  // =====================================================
 
   const openModal = () => {
 
@@ -299,13 +460,25 @@ export default function UserCelebrationCard({
 
   };
 
+  // =====================================================
+
+  // KUTLAMA MESAJINI GÖNDER
+
+  // =====================================================
+
   const handleSend = async () => {
 
     if (disabled || !message.trim()) return;
 
     if (!senderId) {
 
-      Alert.alert("Hata", "Giriş yapan kullanıcı bilgisi bulunamadı.");
+      Alert.alert(
+
+        "Hata",
+
+        "Giriş yapan kullanıcı bilgisi bulunamadı."
+
+      );
 
       return;
 
@@ -313,7 +486,13 @@ export default function UserCelebrationCard({
 
     if (!user.id) {
 
-      Alert.alert("Hata", "Mesaj gönderilecek kullanıcı bulunamadı.");
+      Alert.alert(
+
+        "Hata",
+
+        "Mesaj gönderilecek kullanıcı bulunamadı."
+
+      );
 
       return;
 
@@ -321,7 +500,13 @@ export default function UserCelebrationCard({
 
     if (String(senderId) === String(user.id)) {
 
-      Alert.alert("Uyarı", "Kendinize kutlama mesajı gönderemezsiniz.");
+      Alert.alert(
+
+        "Uyarı",
+
+        "Kendinize kutlama mesajı gönderemezsiniz."
+
+      );
 
       return;
 
@@ -343,7 +528,7 @@ export default function UserCelebrationCard({
 
           type,
 
-        }),
+        })
 
       ).unwrap();
 
@@ -353,7 +538,13 @@ export default function UserCelebrationCard({
 
       setMessage("");
 
-      Alert.alert("Başarılı", "Kutlama mesajınız gönderildi.");
+      Alert.alert(
+
+        "Başarılı",
+
+        "Kutlama mesajınız gönderildi."
+
+      );
 
     } catch (error) {
 
@@ -361,7 +552,11 @@ export default function UserCelebrationCard({
 
         "Mesaj Gönderilemedi",
 
-        typeof error === "string" ? error : "Bir hata oluştu. Tekrar deneyin.",
+        typeof error === "string"
+
+          ? error
+
+          : "Bir hata oluştu. Tekrar deneyin."
 
       );
 
@@ -373,21 +568,47 @@ export default function UserCelebrationCard({
 
   };
 
+  // =====================================================
+
+  // EKRAN
+
+  // =====================================================
+
   return (
 
     <View style={styles.card}>
 
-      {isWeekly && remainingDays != null && remainingDays > 0 && (
+      {/* HAFTALIK GERİ SAYIM */}
 
-        <View style={styles.countdownContainer}>
+      {isWeekly &&
 
-          <Ionicons name="time-outline" size={15} color={COLORS.red} />
+        remainingDays != null &&
 
-          <Text style={styles.countdownText}>{remainingDays} gün kaldı</Text>
+        remainingDays > 0 && (
 
-        </View>
+          <View style={styles.countdownContainer}>
 
-      )}
+            <Ionicons
+
+              name="time-outline"
+
+              size={15}
+
+              color={COLORS.red}
+
+            />
+
+            <Text style={styles.countdownText}>
+
+              {remainingDays} gün kaldı
+
+            </Text>
+
+          </View>
+
+        )}
+
+      {/* PROFİL RESMİ */}
 
       <View style={styles.avatar}>
 
@@ -401,13 +622,20 @@ export default function UserCelebrationCard({
 
             resizeMode="cover"
 
-            onError={() => setImageError(true)}
+            onError={(event) => {
+                console.warn("[USER IMAGE] Yüklenemedi:", imageUrl, event.nativeEvent.error);
+                setImageError(true);
+              }}
 
           />
 
         ) : (
 
-          <Text style={styles.avatarText}>{initials}</Text>
+          <Text style={styles.avatarText}>
+
+            {initials}
+
+          </Text>
 
         )}
 
@@ -415,7 +643,19 @@ export default function UserCelebrationCard({
 
           <Ionicons
 
-            name={isWelcome ? "person-add-outline" : isBirthday ? "gift-outline" : "ribbon-outline"}
+            name={
+
+              isWelcome
+
+                ? "person-add-outline"
+
+                : isBirthday
+
+                  ? "gift-outline"
+
+                  : "ribbon-outline"
+
+            }
 
             size={15}
 
@@ -427,78 +667,109 @@ export default function UserCelebrationCard({
 
       </View>
 
+      {/* KULLANICI ADI */}
+
       <Text style={styles.name} numberOfLines={1}>
 
         {fullName}
 
       </Text>
 
-      <Text style={styles.description} numberOfLines={2}>
+      {/* AÇIKLAMA */}
+
+      <Text
+
+        style={styles.description}
+
+        numberOfLines={2}
+
+      >
 
         {isWelcome
+
           ? "Aramıza Hoş Geldin!"
+
           : isBirthday
-          ? isWeekly
 
-            ? ""
+            ? isWeekly
 
-            : "Doğum Günün Kutlu Olsun!"
+              ? ""
 
-          : `${years}. İş Yıl Dönümü yaklaşıyor!`}
+              : "Doğum Günün Kutlu Olsun!"
+
+            : `${years}. İş Yıl Dönümü yaklaşıyor!`}
 
       </Text>
 
-     {!isWeekly && !isWelcome && (
+      {/* KUTLA BUTONU */}
 
-  <TouchableOpacity
+      {/* HOŞ GELDİN İÇİN DE AKTİF */}
 
-    style={[
+      {!isWeekly && (
 
-      styles.celebrateButton,
+        <TouchableOpacity
 
-      disabled && styles.disabledCelebrateButton,
+          style={[
 
-    ]}
+            styles.celebrateButton,
 
-    activeOpacity={0.85}
+            disabled && styles.disabledCelebrateButton,
 
-    onPress={openModal}
+          ]}
 
-    disabled={disabled}
+          activeOpacity={0.85}
 
-    accessibilityRole="button"
+          onPress={openModal}
 
-    accessibilityState={{ disabled }}
+          disabled={disabled}
 
-  >
+          accessibilityRole="button"
 
-    <Ionicons
+          accessibilityState={{ disabled }}
 
-      name={hasCelebrated ? "checkmark-circle-outline" : "paper-plane-outline"}
+        >
 
-      size={17}
+          <Ionicons
 
-      color={COLORS.white}
+            name={
 
-    />
+              hasCelebrated
 
-    <Text style={styles.celebrateText}>
+                ? "checkmark-circle-outline"
 
-      {hasCelebrated
+                : "paper-plane-outline"
 
-        ? "Kutlandı"
+            }
 
-        : checkingCelebration
+            size={17}
 
-          ? "Kontrol Ediliyor"
+            color={COLORS.white}
 
-          : "Kutla"}
+          />
 
-    </Text>
+          <Text style={styles.celebrateText}>
 
-  </TouchableOpacity>
+            {hasCelebrated
 
-)}
+              ? "Kutlandı"
+
+              : checkingCelebration
+
+                ? "Kontrol Ediliyor"
+
+                : "Kutla"}
+
+          </Text>
+
+        </TouchableOpacity>
+
+      )}
+
+      {/* =================================================
+
+          KUTLAMA MODALI
+
+      ================================================= */}
 
       <Modal
 
@@ -510,7 +781,11 @@ export default function UserCelebrationCard({
 
         onRequestClose={() => {
 
-          if (!sending) setModalVisible(false);
+          if (!sending) {
+
+            setModalVisible(false);
+
+          }
 
         }}
 
@@ -520,7 +795,15 @@ export default function UserCelebrationCard({
 
           style={styles.overlay}
 
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={
+
+            Platform.OS === "ios"
+
+              ? "padding"
+
+              : undefined
+
+          }
 
         >
 
@@ -532,15 +815,33 @@ export default function UserCelebrationCard({
 
               showsVerticalScrollIndicator={false}
 
-              contentContainerStyle={styles.modalScrollContent}
+              contentContainerStyle={
+
+                styles.modalScrollContent
+
+              }
 
             >
+
+              {/* MODAL İKONU */}
 
               <View style={styles.modalIcon}>
 
                 <Ionicons
 
-                  name={isWelcome ? "person-add-outline" : isBirthday ? "gift-outline" : "ribbon-outline"}
+                  name={
+
+                    isWelcome
+
+                      ? "person-add-outline"
+
+                      : isBirthday
+
+                        ? "gift-outline"
+
+                        : "ribbon-outline"
+
+                  }
 
                   size={30}
 
@@ -550,45 +851,77 @@ export default function UserCelebrationCard({
 
               </View>
 
+              {/* KULLANICI */}
+
               <Text style={styles.modalTitle}>
 
                 {fullName}
 
               </Text>
 
-              <Text style={styles.modalSubtitle}>Kutlama mesajı seç veya yaz</Text>
+              <Text style={styles.modalSubtitle}>
+
+                Kutlama mesajı seç veya yaz
+
+              </Text>
+
+              {/* HAZIR MESAJLAR */}
 
               <View style={styles.messageOptions}>
 
-                {messageExamples.map((example, index) => (
+                {messageExamples.map(
 
-                  <TouchableOpacity
+                  (example, index) => (
 
-                    key={index}
+                    <TouchableOpacity
 
-                    activeOpacity={0.8}
+                      key={index}
 
-                    disabled={sending}
+                      activeOpacity={0.8}
 
-                    onPress={() => setMessage(example)}
+                      disabled={sending}
 
-                    style={[
+                      onPress={() =>
 
-                      styles.messageOption,
+                        setMessage(example)
 
-                      message === example && styles.selectedMessageOption,
+                      }
 
-                    ]}
+                      style={[
 
-                  >
+                        styles.messageOption,
 
-                    <Text style={styles.messageOptionText}>{example}</Text>
+                        message === example &&
 
-                  </TouchableOpacity>
+                          styles.selectedMessageOption,
 
-                ))}
+                      ]}
+
+                    >
+
+                      <Text
+
+                        style={
+
+                          styles.messageOptionText
+
+                        }
+
+                      >
+
+                        {example}
+
+                      </Text>
+
+                    </TouchableOpacity>
+
+                  )
+
+                )}
 
               </View>
+
+              {/* MESAJ GİRİŞİ */}
 
               <TextInput
 
@@ -610,43 +943,69 @@ export default function UserCelebrationCard({
 
               />
 
+              {/* GÖNDER */}
+
               <TouchableOpacity
 
                 style={[
 
                   styles.sendButton,
 
-                  (sending || !message.trim()) && styles.disabledButton,
+                  (sending || !message.trim()) &&
+
+                    styles.disabledButton,
 
                 ]}
 
                 onPress={handleSend}
 
-                disabled={sending || !message.trim()}
+                disabled={
+
+                  sending || !message.trim()
+
+                }
 
               >
 
                 {sending ? (
 
-                  <ActivityIndicator color={COLORS.white} />
+                  <ActivityIndicator
+
+                    color={COLORS.white}
+
+                  />
 
                 ) : (
 
-                  <Text style={styles.sendText}>Mesaj Gönder</Text>
+                  <Text style={styles.sendText}>
+
+                    Mesaj Gönder
+
+                  </Text>
 
                 )}
 
               </TouchableOpacity>
 
+              {/* VAZGEÇ */}
+
               <TouchableOpacity
 
-                onPress={() => setModalVisible(false)}
+                onPress={() =>
+
+                  setModalVisible(false)
+
+                }
 
                 disabled={sending}
 
               >
 
-                <Text style={styles.cancel}>Vazgeç</Text>
+                <Text style={styles.cancel}>
+
+                  Vazgeç
+
+                </Text>
 
               </TouchableOpacity>
 
@@ -663,6 +1022,12 @@ export default function UserCelebrationCard({
   );
 
 }
+
+// =====================================================
+
+// STYLES
+
+// =====================================================
 
 const styles = StyleSheet.create({
 
@@ -688,7 +1053,13 @@ const styles = StyleSheet.create({
 
     shadowColor: COLORS.navy,
 
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: {
+
+      width: 0,
+
+      height: 5,
+
+    },
 
     shadowOpacity: 0.06,
 
@@ -746,9 +1117,25 @@ const styles = StyleSheet.create({
 
   },
 
-  avatarImage: { width: 80, height: 100, borderRadius: 38 },
+  avatarImage: {
 
-  avatarText: { fontSize: 25, fontWeight: "800", color: COLORS.navy },
+    width: 80,
+
+    height: 100,
+
+    borderRadius: 38,
+
+  },
+
+  avatarText: {
+
+    fontSize: 25,
+
+    fontWeight: "800",
+
+    color: COLORS.navy,
+
+  },
 
   avatarBadge: {
 
@@ -830,9 +1217,23 @@ const styles = StyleSheet.create({
 
   },
 
-  disabledCelebrateButton: { backgroundColor: "#4d6ca5", opacity: 0.65 },
+  disabledCelebrateButton: {
 
-  celebrateText: { color: COLORS.white, fontSize: 14, fontWeight: "bold" },
+    backgroundColor: "#4d6ca5",
+
+    opacity: 0.65,
+
+  },
+
+  celebrateText: {
+
+    color: COLORS.white,
+
+    fontSize: 14,
+
+    fontWeight: "bold",
+
+  },
 
   overlay: {
 
@@ -858,7 +1259,11 @@ const styles = StyleSheet.create({
 
   },
 
-  modalScrollContent: { alignItems: "center" },
+  modalScrollContent: {
+
+    alignItems: "center",
+
+  },
 
   modalIcon: {
 
@@ -878,11 +1283,35 @@ const styles = StyleSheet.create({
 
   },
 
-  modalTitle: { fontSize: 20, fontWeight: "700", color: COLORS.navy },
+  modalTitle: {
 
-  modalSubtitle: { color: COLORS.muted, marginTop: 6, marginBottom: 20 },
+    fontSize: 20,
 
-  messageOptions: { width: "100%", gap: 10, marginBottom: 15 },
+    fontWeight: "700",
+
+    color: COLORS.navy,
+
+  },
+
+  modalSubtitle: {
+
+    color: COLORS.muted,
+
+    marginTop: 6,
+
+    marginBottom: 20,
+
+  },
+
+  messageOptions: {
+
+    width: "100%",
+
+    gap: 10,
+
+    marginBottom: 15,
+
+  },
 
   messageOption: {
 
@@ -906,7 +1335,13 @@ const styles = StyleSheet.create({
 
   },
 
-  messageOptionText: { fontSize: 14, color: COLORS.navy },
+  messageOptionText: {
+
+    fontSize: 14,
+
+    color: COLORS.navy,
+
+  },
 
   input: {
 
@@ -944,10 +1379,26 @@ const styles = StyleSheet.create({
 
   },
 
-  disabledButton: { opacity: 0.55 },
+  disabledButton: {
 
-  sendText: { color: COLORS.white, fontWeight: "700" },
+    opacity: 0.55,
 
-  cancel: { marginTop: 18, color: COLORS.muted },
+  },
+
+  sendText: {
+
+    color: COLORS.white,
+
+    fontWeight: "700",
+
+  },
+
+  cancel: {
+
+    marginTop: 18,
+
+    color: COLORS.muted,
+
+  },
 
 });

@@ -1,12 +1,18 @@
 
-import React, { useState } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import React, { useCallback, useRef, useState } from "react";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+
+import { useFocusEffect, useScrollToTop } from "@react-navigation/native";
+import { useDispatch } from "react-redux";
 
 import TodayMenuSection from "../components/TodayMenuSection";
 import UserCelebrationSection from "../components/UserCelebrationSection";
 import CreateBlogModal from "../components/CreateBlogModal";
 
-import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../redux/Store";
 import { fetchBlogs } from "../redux/slices/BlogSlice";
 import { useHeaderScroll } from "../context/HeaderScrollContext";
@@ -15,18 +21,39 @@ export default function HomeScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { setCollapsed } = useHeaderScroll();
 
-  const [blogModalVisible, setBlogModalVisible] = useState(false);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+
+  const [blogModalVisible, setBlogModalVisible] =
+    useState(false);
+
+  // Home sekmesine yeniden basılınca yukarı kaydır.
+  useScrollToTop(scrollRef);
+
+  // Home ekranı açıldığında header genişlesin.
+  useFocusEffect(
+    useCallback(() => {
+      setCollapsed(false);
+
+      return () => {
+        setCollapsed(false);
+      };
+    }, [setCollapsed]),
+  );
+
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+
+    setCollapsed(scrollY > 20);
+  };
 
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         scrollEventThrottle={16}
-        onScroll={(event) => {
-          const scrollY = event.nativeEvent.contentOffset.y;
-          setCollapsed(scrollY > 20);
-        }}
+        onScroll={handleScroll}
       >
         {/* YEMEK MENÜSÜ */}
         <TodayMenuSection />

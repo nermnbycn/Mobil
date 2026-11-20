@@ -1,5 +1,10 @@
 
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   View,
@@ -16,6 +21,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { useFocusEffect } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import Svg, { Path } from "react-native-svg";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -31,8 +37,6 @@ const COLORS = {
 };
 
 const EXPANDED_HEIGHT = 225;
-// Diğer sekmelerde mavi SVG alanının bittiği yükseklik.
-// Alttaki beyaz/şeffaf boşluk header animasyonuna katılmaz.
 const NON_HOME_BLUE_HEIGHT = 188;
 const SVG_HEIGHT = 205;
 const HEADER_ROW_HEIGHT = 60;
@@ -50,6 +54,11 @@ interface AppHeaderProps {
 }
 
 const shortcuts = [
+  {
+    key: "overview",
+    title: "Genel Bakış",
+    icon: "view-dashboard-outline",
+  },
   {
     key: "blogs",
     title: "Bloglar",
@@ -77,28 +86,44 @@ export default function AppHeader({
   onShortcutPress,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
-  const { collapsed, isHomeTab } = useHeaderScroll();
+  const { collapsed, isHomeTab, homePressCount } = useHeaderScroll();
   const { width } = useWindowDimensions();
 
   const profile = useSelector(
     (state: RootState) => state.profile.profile,
   );
 
+  // Genel Bakış varsayılan olarak aktif.
   const [activeShortcut, setActiveShortcut] =
-    useState<string | null>(null);
+    useState<string>("overview");
+    useEffect(() => {
+  setActiveShortcut("overview");
+}, [homePressCount]);
 
   const animation = useRef(new Animated.Value(0)).current;
   const handRotation = useRef(new Animated.Value(0)).current;
 
-  // Home mevcut şekilde çalışır; diğer sekmelerde de mavi alan kapanabilir.
   const isCollapsed = collapsed;
-  const expandedHeight = isHomeTab ? EXPANDED_HEIGHT : NON_HOME_BLUE_HEIGHT;
+
+  const expandedHeight = isHomeTab
+    ? EXPANDED_HEIGHT
+    : NON_HOME_BLUE_HEIGHT;
 
   const collapsedHeight = insets.top + HEADER_ROW_HEIGHT;
 
   const shouldShowShortcuts = showShortcuts && isHomeTab;
 
-  // HEADER AÇILMA / KAPANMA
+  // Home ekranına geri dönüldüğünde
+  // Genel Bakış tekrar aktif olur.
+  useFocusEffect(
+    useCallback(() => {
+      if (isHomeTab) {
+        setActiveShortcut("overview");
+      }
+    }, [isHomeTab]),
+  );
+
+  // HEADER AÇILMA / KAPANMA ANİMASYONU
   useEffect(() => {
     Animated.timing(animation, {
       toValue: isCollapsed ? 1 : 0,
@@ -118,25 +143,25 @@ export default function AppHeader({
     outputRange: ["transparent", COLORS.primary],
   });
 
-  // Kavis animasyon sırasında kaybolur.
+  // KAVİS OPACITY ANİMASYONU
   const svgOpacity = animation.interpolate({
     inputRange: [0, 0.8, 1],
     outputRange: [1, 0, 0],
   });
 
-  // Kartlar erken saydamlaşır.
+  // KARTLARIN OPACITY ANİMASYONU
   const shortcutOpacity = animation.interpolate({
     inputRange: [0, 0.3, 0.65, 1],
     outputRange: [1, 0.65, 0, 0],
   });
 
-  // Kartların dikey hareketi.
+  // KARTLARIN DİKEY HAREKETİ
   const shortcutTranslateY = animation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -30],
   });
 
-  // Kartların alt içerik için ayırdığı alan.
+  // KARTLARIN ALTTA AYIRDIĞI ALAN
   const shortcutSpace = animation.interpolate({
     inputRange: [0, 1],
     outputRange: [
@@ -190,6 +215,12 @@ export default function AppHeader({
     inputRange: [-1, 0, 1],
     outputRange: ["-22deg", "0deg", "22deg"],
   });
+
+  // KART SEÇİMİ
+  const handleShortcutPress = (key: string) => {
+  setActiveShortcut(key);
+  onShortcutPress?.(key);
+};
 
   return (
     <View style={styles.container}>
@@ -255,9 +286,7 @@ export default function AppHeader({
                   style={[
                     styles.wavingHand,
                     {
-                      transform: [
-                        { rotate: handRotate },
-                      ],
+                      transform: [{ rotate: handRotate }],
                     },
                   ]}
                 >
@@ -268,7 +297,7 @@ export default function AppHeader({
           </SafeAreaView>
         </Animated.View>
 
-        {/* MUTLAK KONUMLU SHORTCUT KARTLARI */}
+        {/* KISAYOL KARTLARI */}
         {shouldShowShortcuts && (
           <Animated.View
             pointerEvents={isCollapsed ? "none" : "auto"}
@@ -289,7 +318,8 @@ export default function AppHeader({
               contentContainerStyle={styles.shortcutsContainer}
             >
               {shortcuts.map((item) => {
-                const active = activeShortcut === item.key;
+                const active =
+                  activeShortcut === item.key;
 
                 return (
                   <TouchableOpacity
@@ -299,10 +329,9 @@ export default function AppHeader({
                       styles.shortcutCard,
                       active && styles.activeCard,
                     ]}
-                    onPress={() => {
-                      setActiveShortcut(item.key);
-                      onShortcutPress?.(item.key);
-                    }}
+                    onPress={() =>
+                      handleShortcutPress(item.key)
+                    }
                   >
                     <MaterialCommunityIcons
                       name={item.icon}
@@ -348,7 +377,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: "transparent",
     zIndex: 10,
-    overflow: "visible"
+    overflow: "visible",
   },
 
   headerArea: {
@@ -400,7 +429,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // KARTLAR HEADER'IN ÜZERİNDE BAĞIMSIZ KATMAN
   shortcutOverlay: {
     position: "absolute",
     bottom: -10,
@@ -468,8 +496,6 @@ const styles = StyleSheet.create({
     width: 17,
     height: 20,
     backgroundColor: "#DBE4F5",
-    transform: [
-      { rotate: "45deg" },
-    ],
+    transform: [{ rotate: "45deg" }],
   },
 });

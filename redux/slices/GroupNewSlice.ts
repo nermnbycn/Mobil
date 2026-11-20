@@ -6,25 +6,24 @@ import { BASE_URL } from "../../services/api";
 // =====================================================
 // HABER MODELİ
 // =====================================================
+
 export interface GroupNew {
-  id: number;
-  tenantId: number | null;
-  createTime: string | null;
-  createdBy: string | null;
-  updateTime: string | null;
-  updatedBy: string | null;
-  isDeleted: boolean;
-  deleteTime: string | null;
-  deletedBy: string | null;
-  title: string | null;
-  content: string | null;
+  id: string;
+  title: string;
+  summary: string | null;
+  content: string;
   imageUrl: string | null;
+  publishedAt: string;
+  expiresAt: string | null;
+  isPinned: boolean;
+  companyId: string | null;
   hit: number;
 }
 
 // =====================================================
 // REDUX STATE
 // =====================================================
+
 interface GroupNewState {
   news: GroupNew[];
   loading: boolean;
@@ -48,6 +47,7 @@ const initialState: GroupNewState = {
 // =====================================================
 // JWT İLE API İSTEĞİ
 // =====================================================
+
 async function fetchWithAuth(
   endpoint: string,
   method: "GET" | "POST" = "GET",
@@ -59,9 +59,9 @@ async function fetchWithAuth(
     throw new Error("Oturum bulunamadı. Tekrar giriş yapın.");
   }
 
-  const url = `${BASE_URL}${endpoint}`;
+  const url = `${BASE_URL.replace(/\/+$/, "")}${endpoint}`;
 
-  console.log("[GROUP NEW] İstek:", method, url);
+  console.log("[GROUP NEWS] İstek:", method, url);
 
   const response = await fetch(url, {
     method,
@@ -73,31 +73,39 @@ async function fetchWithAuth(
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
-  console.log("[GROUP NEW] HTTP:", response.status);
+  console.log("[GROUP NEWS] HTTP:", response.status);
 
   const responseText = await response.text();
 
   let result: unknown = null;
 
-  if (responseText) {
+  if (responseText.trim()) {
     try {
       result = JSON.parse(responseText);
     } catch {
-      throw new Error("API geçerli JSON döndürmedi.");
+      throw new Error(
+        `API geçerli JSON döndürmedi. HTTP: ${response.status}`
+      );
     }
   }
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("Oturum süresi dolmuş veya token geçersiz.");
+      throw new Error(
+        "Oturum süresi dolmuş veya token geçersiz."
+      );
     }
 
     if (response.status === 403) {
-      throw new Error("Haberlere erişim yetkiniz yok.");
+      throw new Error(
+        "Haberlere erişim yetkiniz yok."
+      );
     }
 
     if (response.status === 404) {
-      throw new Error("Haber endpoint'i veya kayıt bulunamadı.");
+      throw new Error(
+        "Haber endpoint'i veya kayıt bulunamadı."
+      );
     }
 
     const errorData =
@@ -119,6 +127,7 @@ async function fetchWithAuth(
 // =====================================================
 // HABER LİSTESİNİ RESPONSE İÇİNDEN ÇIKAR
 // =====================================================
+
 function extractGroupNews(result: unknown): GroupNew[] {
   if (Array.isArray(result)) {
     return result as GroupNew[];
@@ -150,18 +159,48 @@ function extractGroupNews(result: unknown): GroupNew[] {
     }
   }
 
-  console.error(
-    "[GROUP NEW] Beklenmeyen response alanları:",
-    Object.keys(response)
+  throw new Error(
+    "API yanıtında haber listesi bulunamadı."
   );
-
-  throw new Error("API yanıtında haber listesi bulunamadı.");
 }
 
 // =====================================================
-// HABERLERİ GETİR
-// POST /api/GroupNew/getList
+// HABER DETAYINI RESPONSE İÇİNDEN ÇIKAR
 // =====================================================
+
+function extractGroupNewDetail(result: unknown): GroupNew {
+  if (!result || typeof result !== "object") {
+    throw new Error("API geçersiz haber detayı döndürdü.");
+  }
+
+  const response = result as Record<string, unknown>;
+
+  // API: { data: { id, title, ... } }
+  // Alternatif: { id, title, ... }
+  const data = response.data ?? response;
+
+  if (
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
+    throw new Error("Haber detayı bulunamadı.");
+  }
+
+  const news = data as GroupNew;
+
+  if (typeof news.id !== "string" || !news.id) {
+    throw new Error("Haber detayının ID bilgisi geçersiz.");
+  }
+
+  return news;
+}
+
+// =====================================================
+// HABERLERİ LİSTELE
+// POST /api/News/getList
+// =====================================================
+
 export const fetchGroupNews = createAsyncThunk<
   GroupNew[],
   void,
@@ -181,11 +220,14 @@ export const fetchGroupNews = createAsyncThunk<
 
       const news = extractGroupNews(result);
 
-      console.log("[GROUP NEW] Gelen haber sayısı:", news.length);
+      console.log(
+        "[GROUP NEWS] Gelen haber sayısı:",
+        news.length
+      );
 
       return news;
     } catch (error) {
-      console.error("[GROUP NEW] Liste hatası:", error);
+      console.error("[GROUP NEWS] Liste hatası:", error);
 
       return rejectWithValue(
         error instanceof Error
@@ -198,40 +240,45 @@ export const fetchGroupNews = createAsyncThunk<
 
 // =====================================================
 // HABER DETAYINI GETİR
-// Mevcut GET endpoint'i korundu.
+// POST /api/News/getById
+// BODY: { id: "UUID" }
 // =====================================================
+
 export const fetchGroupNewById = createAsyncThunk<
   GroupNew,
-  number,
+  string,
   { rejectValue: string }
 >(
   "groupNew/fetchGroupNewById",
   async (newsId, { rejectWithValue }) => {
     try {
+      if (!newsId) {
+        throw new Error("Haber ID bilgisi bulunamadı.");
+      }
+
       const result = await fetchWithAuth(
-        `/api/GroupNew/${newsId}`
+        "/api/News/getById",
+        "POST",
+        {
+          id: newsId,
+        }
       );
 
-      const response = result as {
-        data?: GroupNew;
-      } & GroupNew;
+      const news = extractGroupNewDetail(result);
 
-      // Yeni API data nesnesi döndürüyorsa onu kullan.
-      // Eski API doğrudan haber nesnesi döndürüyorsa onu kullan.
-      const news = response?.data ?? response;
-
-      if (!news || !news.id) {
-        throw new Error("Haber detayı bulunamadı.");
-      }
+      console.log(
+        "[GROUP NEWS] Detay getirildi:",
+        news.id
+      );
 
       return news;
     } catch (error) {
-      console.error("[GROUP NEW] Detay hatası:", error);
+      console.error("[GROUP NEWS] Detay hatası:", error);
 
       return rejectWithValue(
         error instanceof Error
           ? error.message
-          : "Haber getirilemedi."
+          : "Haber detayı getirilemedi."
       );
     }
   }
@@ -240,6 +287,7 @@ export const fetchGroupNewById = createAsyncThunk<
 // =====================================================
 // REDUX SLICE
 // =====================================================
+
 const groupNewSlice = createSlice({
   name: "groupNew",
   initialState,
@@ -250,49 +298,48 @@ const groupNewSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
-      // HABERLER YÜKLENİYOR
+      // LİSTE YÜKLENİYOR
       .addCase(fetchGroupNews.pending, (state) => {
         state.loading = true;
         state.error = null;
         state.news = [];
       })
 
-      // HABERLER BAŞARIYLA YÜKLENDİ
+      // LİSTE BAŞARILI
       .addCase(fetchGroupNews.fulfilled, (state, action) => {
         state.loading = false;
         state.news = action.payload;
         state.error = null;
       })
 
-      // HABERLER YÜKLENEMEDİ
+      // LİSTE HATALI
       .addCase(fetchGroupNews.rejected, (state, action) => {
         state.loading = false;
         state.news = [];
         state.error =
-          action.payload ??
-          "Haberler yüklenirken bir hata oluştu.";
+          action.payload ?? "Haberler yüklenemedi.";
       })
 
-      // HABER DETAYI YÜKLENİYOR
+      // DETAY YÜKLENİYOR
       .addCase(fetchGroupNewById.pending, (state) => {
         state.detailLoading = true;
         state.detailError = null;
         state.selectedGroupNew = null;
       })
 
-      // HABER DETAYI BAŞARILI
+      // DETAY BAŞARILI
       .addCase(fetchGroupNewById.fulfilled, (state, action) => {
         state.detailLoading = false;
         state.selectedGroupNew = action.payload;
         state.detailError = null;
       })
 
-      // HABER DETAYI HATALI
+      // DETAY HATALI
       .addCase(fetchGroupNewById.rejected, (state, action) => {
         state.detailLoading = false;
         state.selectedGroupNew = null;
         state.detailError =
-          action.payload ?? "Haber getirilemedi.";
+          action.payload ?? "Haber detayı getirilemedi.";
       });
   },
 });

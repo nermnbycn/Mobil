@@ -6,6 +6,7 @@ import profileReducer from "./slices/ProfileSlice";
 import groupNewReducer from "./slices/GroupNewSlice";
 import announcementReducer from "./slices/AnnouncementSlice";
 import messageReducer from "./slices/MessageSlice";
+import notificationReducer from "./slices/NotificationSlice";
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     groupNew: groupNewReducer,
     announcement: announcementReducer,
     message: messageReducer,
+    notification: notificationReducer,
   },
 });
 
