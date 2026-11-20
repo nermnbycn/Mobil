@@ -18,7 +18,7 @@ import type { RootState, AppDispatch } from "../redux/Store";
 import { fetchAnnouncements, type Announcement } from "../redux/slices/AnnouncementSlice";
 import { useHeaderScroll } from "../context/HeaderScrollContext";
 
-const ACTION_SUITE_IMAGE = require("../assets/uploads/announcement/action-suite.png");
+const ACTION_SUITE_IMAGE = require("../assets/uploads/announcement/actionSuite.png");
 const PORTAL_IMAGE = require("../assets/uploads/announcement/portal.png");
 
 const COLORS = {
@@ -103,7 +103,7 @@ export default function AnnouncementsScreen() {
       .toLocaleLowerCase("tr-TR")
       .replace(/\s+/g, "")
       .includes("actionsuite")
-      ? "contain"
+      ? "cover"
       : "cover"
   }
 />

@@ -42,7 +42,7 @@ const COLORS = {
 
 // YEREL DUYURU GÖRSELLERİ
 const ACTION_SUITE_IMAGE = require(
-  "../assets/uploads/announcement/action-suite.png"
+  "../assets/uploads/announcement/actionSuite.png"
 );
 
 const PORTAL_IMAGE = require(
